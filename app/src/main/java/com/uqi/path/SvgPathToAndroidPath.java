@@ -122,6 +122,8 @@ public class SvgPathToAndroidPath {
             char c = svgPath.charAt(mIndex);
             if ('A' <= c && c <= 'Z') {
                 cmdPositions.add(mIndex);
+            }else if ('a' <= c && c <= 'z') {
+                cmdPositions.add(mIndex);
             }
             ++mIndex;
         }
