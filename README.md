@@ -58,3 +58,8 @@ lView.restScale();//原始大小
 > * 1.View会使用的时候重新计算大小，等比缩放View，用宽度来计算高度,建议layout_width使用match_parent
 > * 2.View中没有对移动做边界处理
 > * 3.View中缩放没有指定缩放坐标，因此在缩放后会感觉跑偏
+
+
+##地图数据来源
+---
+[SVG中国地图](http://www.jq22.com/yanshi3031)
