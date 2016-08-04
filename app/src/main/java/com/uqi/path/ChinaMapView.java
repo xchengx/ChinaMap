@@ -62,7 +62,7 @@ public class ChinaMapView extends View implements View.OnTouchListener {
             /**33 台湾  */"M505.438,371.203L502.221,390.37199999999996L500.557,396.44199999999995V401.56499999999994L499.127,402.99199999999996L495.676,397.87299999999993L491.983,395.01499999999993L488.76800000000003,386.4439999999999C488.76800000000003,386.4439999999999,488.317,380.8239999999999,489.12500000000006,378.7039999999999C489.9340000000001,376.5859999999999,494.48100000000005,364.6539999999999,494.48100000000005,364.6539999999999L500.79400000000004,359.29699999999985L504.845,361.20099999999985L505.438,371.203Z"
     };
 
-     public enum Area {
+    public enum Area {
         BeiJing("BeiJing", 0), TianJin("TianJin", 1), ShangHai("ShangHai", 2), ChongQing("ChongQing", 3),
         HeBei("HeBei", 4), ShanXi("ShanXi", 5), LiaoNing("LiaoNing", 6), HeiLongJiang("HeiLongJiang", 7),
         JiLin("JiLin", 8), JiangSu("JiangSu", 9), ZheJiang("ZheJiang", 10), AnHui("AnHui", 11), FuJian("FuJian", 12),
@@ -155,12 +155,19 @@ public class ChinaMapView extends View implements View.OnTouchListener {
         }
 
     }
+
     private Path[] xPaths = new Path[34];
     private Paint[] xPaints = new Paint[34];
     private Paint touchPaint;
     private int selected = -1;
     private Matrix xMatrix = new Matrix();
     private float translateX, translateY;
+    private int viewHeight, viewWidth;
+    private float minScale = 1;
+    private float maxScale = 6;
+    private float scale;
+    private float defaultScale = 1;
+
     public void setPaintColor(Area pArea, int color, boolean isFull) {
         Paint p = xPaints[pArea.value];
         p.setColor(color);
@@ -214,13 +221,11 @@ public class ChinaMapView extends View implements View.OnTouchListener {
 
     public void zoomIn() {
         scale += 0.3;
-        xMatrix.setScale(scale, scale);
         invalidate();
     }
 
     public void zoomOut() {
         scale -= 0.3;
-        xMatrix.setScale(scale, scale);
         invalidate();
     }
 
@@ -238,7 +243,6 @@ public class ChinaMapView extends View implements View.OnTouchListener {
     }
 
     private void initPaints() {
-        setOnTouchListener(this);
         for (int i = 0; i < xPaints.length; i++) {
             Paint xPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             xPaint.setColor(DEFAULT_COLOR);
@@ -250,26 +254,30 @@ public class ChinaMapView extends View implements View.OnTouchListener {
         touchPaint.setStyle(Paint.Style.FILL);
         touchPaint.setColor(DEFAULT_COLOR);
         touchPaint.setStrokeWidth(1);
+        setOnTouchListener(this);
     }
 
     private PointF[] mPointFs = new PointF[4];
     private float height = 0;
     private float width = 0;
-    /**计算地图边界
+    private int padding = 8;
+
+    /**
+     * 计算地图边界
      * 1.黑龙江是中国最东，最北的省份
      * 2.新疆是中国最西的省份
      * 3.海南是中国最南的省份
-     *
+     * <p/>
      * 地图边界为
-     *  0点                  1点
-     *  0,0------------------heilongjiang.right,0
-     *   |                      |
-     *   |                      |
+     * 0点                  1点
+     * 0,0------------------heilongjiang.right,0
+     * |                      |
+     * |                      |
      * 0,hainan.bottom------heilongjiang.right,hainan.bottom
      * 3点                   2点
      * 地图宽度--->heilongjiang.right
      * 地图高度--->hainan.bottom
-     * */
+     */
     private void computeBounds() {
 
         RectF hljRF = new RectF();
@@ -278,13 +286,13 @@ public class ChinaMapView extends View implements View.OnTouchListener {
         RectF hnRF = new RectF();
         xPaths[Area.HaiNan.value].computeBounds(hnRF, true);
 
-        mPointFs[0] = new PointF(0,0);
+        mPointFs[0] = new PointF(0, 0);
         mPointFs[1] = new PointF(hljRF.right, 0);
         mPointFs[2] = new PointF(hljRF.right, hnRF.bottom);
         mPointFs[3] = new PointF(0, hnRF.bottom);
 
-        width = hljRF.right;
-        height = hnRF.bottom;
+        width = hljRF.right+2*padding;
+        height = hnRF.bottom+2*padding;
     }
 
     public ChinaMapView(Context context) {
@@ -301,14 +309,12 @@ public class ChinaMapView extends View implements View.OnTouchListener {
         initPaints();
     }
 
-    private float scale;
-    private float defaultScale = 1;
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         int speSize = MeasureSpec.getSize(widthMeasureSpec);
-        defaultScale = scale = speSize / width;
+        minScale = defaultScale = scale = speSize / width;
 
         setMeasuredDimension(speSize, (int) (speSize * height / width));
     }
@@ -316,53 +322,148 @@ public class ChinaMapView extends View implements View.OnTouchListener {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+        scale = scale > maxScale ? maxScale : scale < minScale ? minScale : scale;
         xMatrix.setScale(scale, scale);
         canvas.concat(xMatrix);
-        canvas.translate(translateX, translateY);
+        canvas.translate(translateX+padding, translateY+padding);
         drawBaseMap(canvas);
         drawSelectedMap(canvas);
     }
-    private void drawBaseMap(Canvas pCanvas){
+
+    private void drawBaseMap(Canvas pCanvas) {
         for (int i = 0; i < xPaths.length; i++) {
             pCanvas.drawPath(xPaths[i], xPaints[i]);
         }
     }
-    private void drawSelectedMap(Canvas pCanvas){
+
+    private void drawSelectedMap(Canvas pCanvas) {
         if (selected >= 0) {
             pCanvas.drawPath(xPaths[selected], touchPaint);
         }
     }
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+        viewWidth = w;
+        viewHeight = h;
     }
-
-    Region re = new Region();
-
+    private long startOnTouchTime = 0;
     @Override
     public boolean onTouch(View pView, MotionEvent pMotionEvent) {
-        switch (pMotionEvent.getAction()) {
+        switch (pMotionEvent.getAction() & MotionEvent.ACTION_MASK) {
             case MotionEvent.ACTION_DOWN:
-                try {
-                    for (int i = 0; i < xPaths.length; i++) {
-                        RectF r = new RectF();
-                        xPaths[i].computeBounds(r, true);
-                        re.setPath(xPaths[i], new Region((int) r.left, (int) r.top, (int) r.right, (int) r.bottom));
-                        if (re.contains((int) (pMotionEvent.getX() / scale - translateX), (int) (pMotionEvent.getY() / scale - translateY))) {
-                            selected = i;
-                            Log.e("---------->", "---------------------->" + Area.valueOf(i));
-                            invalidate();
-                            return true;
+                mode = NONE;
+                if (pMotionEvent.getPointerCount() == 1) {
+                    startOnTouchTime = System.currentTimeMillis();
+                    mode = NONE;
+                    startPoint.set(pMotionEvent.getX(), pMotionEvent.getY());
+                }
+                break;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                onPointerDown(pMotionEvent);
+                break;
+            case MotionEvent.ACTION_MOVE:
+                onTouchMove(pMotionEvent);
+                break;
+            case MotionEvent.ACTION_POINTER_UP:
+            case MotionEvent.ACTION_UP:
+                mode = NONE;
+                if(pMotionEvent.getPointerCount()==1){
+                    long timeCount = System.currentTimeMillis() - startOnTouchTime;
+                    if(timeCount<300 && Math.abs(pMotionEvent.getX()-startPoint.x)<5f && Math.abs(pMotionEvent.getY()-startPoint.y)<5f){
+                        try {
+                            for (int i = 0; i < xPaths.length; i++) {
+                                RectF r = new RectF();
+                                xPaths[i].computeBounds(r, true);
+                                Region re = new Region();
+                                re.setPath(xPaths[i], new Region((int) r.left, (int) r.top, (int) r.right, (int) r.bottom));
+                                if (re.contains((int) (pMotionEvent.getX() / scale - translateX), (int) (pMotionEvent.getY() / scale - translateY))) {
+                                    selected = i;
+                                    invalidate();
+                                    return true;
+                                }
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
-            case MotionEvent.ACTION_UP:
                 break;
             default:
                 break;
         }
         return true;
     }
+
+    /**
+     * 模式 NONE：无. MOVE：移动. ZOOM:缩放
+     */
+
+    private static final int NONE = 0;
+    private static final int MOVE = 1;
+    private static final int ZOOM = 2;
+    private int mode = NONE;    // 默认模式
+
+    private double startDis = 0d;
+    private PointF startPoint = new PointF();
+
+    /**
+     * 多触点
+     *
+     * @param event
+     */
+    private void onPointerDown(MotionEvent event) {
+        if (event.getPointerCount() == 2) {
+            mode = ZOOM;
+            startDis = getDistance(event);
+        }
+    }
+
+
+    private void onTouchMove(MotionEvent event) {
+        if (mode == ZOOM && event.getPointerCount() == 2) {
+            double endDis = getDistance(event);//结束距离
+            if (endDis > 10f) {
+                float tmpScale = (float) (endDis / startDis);//放大倍数
+                if (tmpScale == 1) {
+                    return;
+                } else {
+                    scale = tmpScale;
+                    invalidate();
+                }
+            }
+        }else {
+            long timeCount = System.currentTimeMillis() - startOnTouchTime;
+            if(timeCount>300 && Math.abs(event.getX()-startPoint.x)>10f && Math.abs(event.getY()-startPoint.y)>10f) {
+                translateX = event.getX() - startPoint.x;
+                translateY = event.getY() - startPoint.y;
+                invalidate();
+            }
+        }
+    }
+
+    /**
+     * @param event
+     * @return 获取两手指之间的距离
+     */
+    private double getDistance(MotionEvent event) {
+        double x = event.getX(0) - event.getX(1);
+        double y = event.getY(0) - event.getY(1);
+        return Math.sqrt(x * x + y * y);
+    }
+
+    /**
+     * 计算两点之间中心点的距离
+     *
+     * @param event
+     * @return
+     */
+    private static PointF mid(MotionEvent event) {
+        float midx = event.getX(1) + event.getX(0);
+        float midy = event.getY(1) - event.getY(0);
+
+        return new PointF(midx / 2, midy / 2);
+    }
+
 }
