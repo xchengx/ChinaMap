@@ -25,6 +25,7 @@ import java.util.Map;
  */
 public class ChinaMapView extends View implements View.OnTouchListener {
     private static final int DEFAULT_COLOR = Color.rgb(0x22, 0x22, 0x22);
+    private static final int DEFAULT_SELECTD_COLOR = Color.rgb(0x00, 0xff, 0xff);
     private static String[] svgPaths = new String[]{
             /**0  北京  */"M421.139,189.75L420.782,186.894L419.95,184.989L425.045,182.863L425.426,181.18L424.23699999999997,176.413H422.56899999999996L415.90299999999996,172.964L412.21299999999997,176.654C412.21299999999997,176.654,411.08799999999997,183.239,411.381,181.534C411.66999999999996,179.82999999999998,407.688,185.822,407.688,185.822L407.094,190.108L407.926,192.371L412.807,191.537L416.5,192.608L418.284,190.941L421.139,189.75Z",
             /**1  天津  */"M430.413,200.491C430.413,200.491,428.581,202.163,427.094,201.775C425.604,201.387,421.615,200.347,421.615,200.347L421.378,198.918L421.14,189.749L424.83,188.082L424.234,186.416L425.044,182.859L425.429,181.17600000000002L427.33,182.126L428.28299999999996,185.22400000000002L427.92699999999996,187.246L431.974,190.104L432.568,192.36700000000002L430.18899999999996,194.03500000000003L429.35499999999996,197.84400000000002L430.413,200.491Z",
@@ -156,6 +157,16 @@ public class ChinaMapView extends View implements View.OnTouchListener {
 
     }
 
+    public interface OnProvinceSelectedListener {
+        public void onprovinceSelected(Area pArea);
+    }
+
+    private OnProvinceSelectedListener xOnProvinceSelectedListener;
+
+    public void setOnProvinceSelectedListener(OnProvinceSelectedListener pOnProvinceSelectedListener) {
+        this.xOnProvinceSelectedListener = pOnProvinceSelectedListener;
+    }
+
     private Path[] xPaths = new Path[34];
     private Paint[] xPaints = new Paint[34];
     private Paint touchPaint;
@@ -167,6 +178,8 @@ public class ChinaMapView extends View implements View.OnTouchListener {
     private float maxScale = 6;
     private float scale;
     private float defaultScale = 1;
+    private int selectdColor = -1;
+    private int mapColor = -1;
 
     public void setPaintColor(Area pArea, int color, boolean isFull) {
         Paint p = xPaints[pArea.value];
@@ -183,6 +196,26 @@ public class ChinaMapView extends View implements View.OnTouchListener {
         if (isFull) {
             p.setStyle(Paint.Style.FILL);
         }
+        invalidate();
+    }
+
+    public void setSelectdColor(int pSelectdColor) {
+        this.selectdColor = pSelectdColor;
+        invalidate();
+    }
+
+    public void setMapColor(int pMapColor) {
+        mapColor = pMapColor;
+        invalidate();
+    }
+
+    public void selectAProvince(Area pArea) {
+        if (selected == pArea.value) {
+            return;
+        }
+        selected = pArea.value;
+        if (this.xOnProvinceSelectedListener != null)
+            this.xOnProvinceSelectedListener.onprovinceSelected(pArea);
         invalidate();
     }
 
@@ -252,7 +285,7 @@ public class ChinaMapView extends View implements View.OnTouchListener {
         }
         touchPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         touchPaint.setStyle(Paint.Style.FILL);
-        touchPaint.setColor(DEFAULT_COLOR);
+        touchPaint.setColor(DEFAULT_SELECTD_COLOR);
         touchPaint.setStrokeWidth(1);
         setOnTouchListener(this);
     }
@@ -291,8 +324,8 @@ public class ChinaMapView extends View implements View.OnTouchListener {
         mPointFs[2] = new PointF(hljRF.right, hnRF.bottom);
         mPointFs[3] = new PointF(0, hnRF.bottom);
 
-        width = hljRF.right+2*padding;
-        height = hnRF.bottom+2*padding;
+        width = hljRF.right + 2 * padding;
+        height = hnRF.bottom + 2 * padding;
     }
 
     public ChinaMapView(Context context) {
@@ -325,19 +358,25 @@ public class ChinaMapView extends View implements View.OnTouchListener {
         scale = scale > maxScale ? maxScale : scale < minScale ? minScale : scale;
         xMatrix.setScale(scale, scale);
         canvas.concat(xMatrix);
-        canvas.translate(translateX+padding, translateY+padding);
+        canvas.translate(translateX + padding, translateY + padding);
         drawBaseMap(canvas);
         drawSelectedMap(canvas);
     }
 
     private void drawBaseMap(Canvas pCanvas) {
         for (int i = 0; i < xPaths.length; i++) {
+            if (mapColor != -1 && xPaints[i].getColor() == DEFAULT_COLOR) {
+                xPaints[i].setColor(mapColor);
+            }
             pCanvas.drawPath(xPaths[i], xPaints[i]);
         }
     }
 
     private void drawSelectedMap(Canvas pCanvas) {
         if (selected >= 0) {
+            if (selectdColor != -1) {
+                touchPaint.setColor(selectdColor);
+            }
             pCanvas.drawPath(xPaths[selected], touchPaint);
         }
     }
@@ -348,7 +387,9 @@ public class ChinaMapView extends View implements View.OnTouchListener {
         viewWidth = w;
         viewHeight = h;
     }
+
     private long startOnTouchTime = 0;
+
     @Override
     public boolean onTouch(View pView, MotionEvent pMotionEvent) {
         switch (pMotionEvent.getAction() & MotionEvent.ACTION_MASK) {
@@ -369,17 +410,22 @@ public class ChinaMapView extends View implements View.OnTouchListener {
             case MotionEvent.ACTION_POINTER_UP:
             case MotionEvent.ACTION_UP:
                 mode = NONE;
-                if(pMotionEvent.getPointerCount()==1){
+                if (pMotionEvent.getPointerCount() == 1) {
                     long timeCount = System.currentTimeMillis() - startOnTouchTime;
-                    if(timeCount<300 && Math.abs(pMotionEvent.getX()-startPoint.x)<5f && Math.abs(pMotionEvent.getY()-startPoint.y)<5f){
+                    if (timeCount < 300 && Math.abs(pMotionEvent.getX() - startPoint.x) < 5f && Math.abs(pMotionEvent.getY() - startPoint.y) < 5f) {
                         try {
                             for (int i = 0; i < xPaths.length; i++) {
                                 RectF r = new RectF();
                                 xPaths[i].computeBounds(r, true);
                                 Region re = new Region();
                                 re.setPath(xPaths[i], new Region((int) r.left, (int) r.top, (int) r.right, (int) r.bottom));
-                                if (re.contains((int) (pMotionEvent.getX() / scale - translateX), (int) (pMotionEvent.getY() / scale - translateY))) {
+                                if (re.contains((int) (pMotionEvent.getX() / scale - translateX - padding), (int) (pMotionEvent.getY() / scale - translateY - padding))) {
+                                    if (i == selected) {
+                                        return true;
+                                    }
                                     selected = i;
+                                    if (this.xOnProvinceSelectedListener != null)
+                                        this.xOnProvinceSelectedListener.onprovinceSelected(Area.valueOf(selected));
                                     invalidate();
                                     return true;
                                 }
@@ -433,9 +479,9 @@ public class ChinaMapView extends View implements View.OnTouchListener {
                     invalidate();
                 }
             }
-        }else {
+        } else {
             long timeCount = System.currentTimeMillis() - startOnTouchTime;
-            if(timeCount>300 && Math.abs(event.getX()-startPoint.x)>10f && Math.abs(event.getY()-startPoint.y)>10f) {
+            if (timeCount > 300 && Math.abs(event.getX() - startPoint.x) > 10f && Math.abs(event.getY() - startPoint.y) > 10f) {
                 translateX = event.getX() - startPoint.x;
                 translateY = event.getY() - startPoint.y;
                 invalidate();

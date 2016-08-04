@@ -12,6 +12,7 @@
 
     <com.uqi.path.ChinaMapView
         android:id="@+id/vp"
+        android:background="#FFFF6F"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_above="@+id/tbuttons"/>
@@ -78,7 +79,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_alignParentBottom="true"
+        android:layout_above="@+id/option"
         >
         <Button
             android:layout_width="0dp"
@@ -93,6 +94,41 @@
             android:layout_weight="1"
             android:text="原始大小"
             android:id="@+id/yaunshidaxiao"
+            />
+
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/option"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        >
+        <Button
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="高亮四川"
+            android:id="@+id/sichuan"
+            android:background="#5cadad"
+            android:textColor="#fff"
+            />
+        <Button
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="高亮内蒙"
+            android:id="@+id/neimeng"
+            android:background="#8f4586"
+            android:textColor="#fff"
+            />
+        <Button
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="选中新疆"
+            android:id="@+id/xinjiang"
+            android:background="#0ff"
+            android:textColor="#fff"
             />
     </LinearLayout>
 </RelativeLayout>
